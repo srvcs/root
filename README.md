@@ -1,78 +1,69 @@
 # srvcs-root
 
-Arithmetic microservice for srvcs.cloud: the **nth root of a value**.
+## Name
 
-`srvcs-root` is an *orchestrator*. It owns the control flow but delegates every
-arithmetic step to other srvcs services, computing
+| Field | Value |
+| --- | --- |
+| Service | `srvcs-root` |
+| Slug | `root` |
+| Repository | `srvcs/root` |
+| Package | `srvcs-root` |
+| Kind | `orchestrator` |
 
-```
-root(value, n) = value ^ (1 / n)
-```
+## Function
 
-as a `f64` (a JSON number that may be fractional).
+arithmetic: nth root of value
 
-## Concern
+## Dependencies
 
-- **service**: `srvcs-root`
-- **concern**: `arithmetic: nth root of value`
-- **depends_on**: `srvcs-floatpower`, `srvcs-floatdivide`
+| Dependency | Repository |
+| --- | --- |
+| `srvcs-floatpower` | [srvcs/floatpower](https://github.com/srvcs/floatpower) |
+| `srvcs-floatdivide` | [srvcs/floatdivide](https://github.com/srvcs/floatdivide) |
 
 ## API
 
-### `GET /`
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | Service identity |
+| `POST` | `/` | Evaluate the service function |
+| `GET` | `/healthz` | Liveness probe |
+| `GET` | `/readyz` | Readiness probe |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/openapi.json` | OpenAPI document |
 
-Service identity.
+## Inputs
 
-```json
-{
-  "service": "srvcs-root",
-  "concern": "arithmetic: nth root of value",
-  "depends_on": ["srvcs-floatpower", "srvcs-floatdivide"]
-}
-```
+| Name | Type | Required |
+| --- | --- | --- |
+| `value` | `number` | yes |
+| `n` | `number` | yes |
 
-### `POST /`
+## Outputs
 
-Request:
-
-```json
-{ "value": 27, "n": 3 }
-```
-
-Response `200`:
-
-```json
-{ "value": 27.0, "n": 3.0, "result": 3.0 }
-```
-
-The `result` is an `f64` and may be fractional; e.g. `root(16, 2) == 4.0`.
-
-## Algorithm
-
-1. `exp = (call srvcs-floatdivide { "a": 1, "b": n }).result`
-2. `result = (call srvcs-floatpower { "base": value, "exp": exp }).result`
-
-`srvcs-root` does **not** call `srvcs-isnumber` directly — input validation
-propagates from its dependencies. `srvcs-floatpower` returns `422` if the
-result is not real (e.g. an even root of a negative value); `srvcs-root`
-forwards that `422`.
-
-### Status codes
-
-- `200` — computed result.
-- `422` — a dependency rejected the input (forwarded verbatim).
-- `500` — a dependency returned a malformed result (contract violation).
-- `503` — a dependency is unavailable (degraded).
+| Name | Type |
+| --- | --- |
+| `value` | `number` |
+| `n` | `number` |
+| `result` | `number` |
 
 ## Configuration
 
-| Variable                | Default                 | Purpose                       |
-| ----------------------- | ----------------------- | ----------------------------- |
-| `SRVCS_BIND_ADDR`       | `0.0.0.0:8080`          | Listen address.               |
-| `SRVCS_FLOATPOWER_URL`  | `http://127.0.0.1:8090` | Base URL of `srvcs-floatpower`. |
-| `SRVCS_FLOATDIVIDE_URL` | `http://127.0.0.1:8091` | Base URL of `srvcs-floatdivide`. |
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `SRVCS_BIND_ADDR` | `0.0.0.0:8080` | Bind address |
+| `SRVCS_ENV` | `development` | Environment label for logs |
+| `RUST_LOG` | `info,tower_http=info` | Tracing filter |
+| `SRVCS_FLOATDIVIDE_URL` | `http://127.0.0.1:8091` | Base URL for srvcs-floatdivide |
+| `SRVCS_FLOATPOWER_URL` | `http://127.0.0.1:8090` | Base URL for srvcs-floatpower |
 
-## Local checks
+## Error Behavior
+
+- `422` means the request could not be evaluated for the documented input shape.
+- `503` means a required dependency was unavailable or returned an unexpected response.
+- Dependency validation errors are forwarded when this service delegates validation.
+
+## Local Checks
 
 ```sh
 cargo fmt --check
@@ -80,5 +71,8 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-See [`srvcs/platform`](https://github.com/srvcs/platform) for the shared service
-standard and CI workflow.
+See the [srvcs service standard](https://github.com/srvcs/platform/blob/main/STANDARD.md) for the full operational contract.
+
+## Metadata
+
+Machine-readable service metadata lives in `srvcs.yaml`. Keep it aligned with this README when the service contract changes.
